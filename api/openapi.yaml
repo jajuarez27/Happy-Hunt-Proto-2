@@ -182,6 +182,184 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /api/saved-places/{id}:
+    delete:
+      summary: Remove a saved place
+      operationId: deleteSavedPlace
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: saved_place_id
+        - name: user_id
+          in: query
+          required: false
+          schema: { type: string, format: uuid }
+          description: Optional owner check — only deletes if it matches
+      responses:
+        '200':
+          description: Saved place deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: string, format: uuid }
+        '400':
+          description: Invalid UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Saved place not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/auth/signin:
+    post:
+      summary: Sign in
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in — returns the user profile (no password_hash)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Missing fields or invalid email
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Invalid email or password
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+        '400':
+          description: Validation failure (fields map included)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      fields: { type: object, additionalProperties: { type: string } }
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/deals:
+    post:
+      summary: Submit / report a happy hour deal
+      operationId: submitDeal
+      description: >
+        Creates a deal under the restaurant's happy hour, reusing an existing
+        active happy hour with the same location/day/times when one exists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [restaurant_id, day_of_week, start_time, end_time, source_url, deal_name, deal_type, regular_price, happy_hour_price]
+              properties:
+                restaurant_id: { type: string, format: uuid }
+                day_of_week:
+                  type: string
+                  enum: [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
+                start_time: { type: string, example: '16:00' }
+                end_time: { type: string, example: '19:00' }
+                source_url: { type: string, format: uri }
+                deal_name: { type: string }
+                description: { type: string, nullable: true }
+                deal_type: { type: string, enum: [food, drink] }
+                regular_price: { type: number, minimum: 0 }
+                happy_hour_price: { type: number, minimum: 0 }
+            example:
+              restaurant_id: 22222222-2222-4222-8222-222222222201
+              day_of_week: Saturday
+              start_time: '12:00'
+              end_time: '14:00'
+              source_url: https://coppertapgrill.example.com/happy-hour
+              deal_name: Brunch Burger
+              deal_type: food
+              regular_price: 14
+              happy_hour_price: 8
+      responses:
+        '201':
+          description: Deal created (happy_hour_id included)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deal:
+                    type: object
+                    properties:
+                      deal_id: { type: string, format: uuid }
+                      happy_hour_id: { type: string, format: uuid }
+                      deal_name: { type: string }
+                      deal_type: { type: string, enum: [food, drink] }
+                      regular_price: { type: number }
+                      happy_hour_price: { type: number }
+                  happy_hour_id: { type: string, format: uuid }
+        '400':
+          description: >
+            Validation failure — `fields` maps each bad field to a message
+            (e.g. end_time after start_time, happy_hour_price <= regular_price)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Error'
+                  - type: object
+                    properties:
+                      fields: { type: object, additionalProperties: { type: string } }
+        '404':
+          description: Restaurant has no location
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 components:
   schemas:
     Restaurant:
@@ -233,6 +411,12 @@ components:
                           deal_type: { type: string, enum: [food, drink] }
                           regular_price: { type: number, nullable: true }
                           happy_hour_price: { type: number, nullable: true }
+    User:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
     SavedPlace:
       type: object
       properties:

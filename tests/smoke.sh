@@ -62,6 +62,45 @@ check "POST /api/saved-places 404" "404" \
   "$(body -X POST "$BASE_URL/api/saved-places" -H 'Content-Type: application/json' \
     -d "{\"user_id\":\"$USER_ID\",\"restaurant_id\":\"00000000-0000-4000-8000-000000000000\"}")"
 
+# 10. POST /api/auth/register (new user -> 201, dup -> 409)
+TS=$(date +%s)
+EMAIL="smoke$TS@example.com"
+reg_code="$(body -X POST "$BASE_URL/api/auth/register" -H 'Content-Type: application/json' \
+  -d "{\"name\":\"Smoke Test\",\"email\":\"$EMAIL\",\"password\":\"password123\"}")"
+check "POST /api/auth/register" "201" "$reg_code"
+check "POST /api/auth/register dup" "409" \
+  "$(body -X POST "$BASE_URL/api/auth/register" -H 'Content-Type: application/json' \
+    -d "{\"name\":\"Smoke Test\",\"email\":\"$EMAIL\",\"password\":\"password123\"}")"
+
+# 11. POST /api/auth/signin (valid -> 200, bad password -> 401)
+check "POST /api/auth/signin" "200" \
+  "$(body -X POST "$BASE_URL/api/auth/signin" -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"password123\"}")"
+check "POST /api/auth/signin 401" "401" \
+  "$(body -X POST "$BASE_URL/api/auth/signin" -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$EMAIL\",\"password\":\"wrongpass\"}")"
+
+# 12. POST /api/deals (valid -> 201)
+check "POST /api/deals" "201" \
+  "$(body -X POST "$BASE_URL/api/deals" -H 'Content-Type: application/json' \
+    -d "{\"restaurant_id\":\"$RESTAURANT_ID\",\"day_of_week\":\"Sunday\",\"start_time\":\"11:00\",\"end_time\":\"13:00\",\"source_url\":\"https://example.com/hh\",\"deal_name\":\"Smoke Deal\",\"deal_type\":\"food\",\"regular_price\":10,\"happy_hour_price\":6}")"
+
+# 13. POST /api/deals (end before start -> 400)
+check "POST /api/deals 400" "400" \
+  "$(body -X POST "$BASE_URL/api/deals" -H 'Content-Type: application/json' \
+    -d "{\"restaurant_id\":\"$RESTAURANT_ID\",\"day_of_week\":\"Sunday\",\"start_time\":\"18:00\",\"end_time\":\"17:00\",\"deal_name\":\"Bad\",\"deal_type\":\"drink\",\"regular_price\":10,\"happy_hour_price\":6}")"
+
+# 14. DELETE /api/saved-places/:id (delete the row created in step 7 -> 200)
+SP_ID=$(curl -s "$BASE_URL/api/saved-places?user_id=$USER_ID" \
+  | grep -o '"saved_place_id":"[^"]*"' | head -1 | cut -d'"' -f4)
+if [ -n "$SP_ID" ]; then
+  check "DELETE /api/saved-places/:id" "200" \
+    "$(body -X DELETE "$BASE_URL/api/saved-places/$SP_ID?user_id=$USER_ID")"
+else
+  echo "FAIL  DELETE /api/saved-places/:id (no saved place found)"
+  FAILED=1
+fi
+
 echo "----------------------------------------"
 if [ "$FAILED" -eq 0 ]; then
   echo "All smoke tests passed."
