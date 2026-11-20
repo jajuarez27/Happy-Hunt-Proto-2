@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Happy Hunt</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Happy Hunt</h1>
+    <p class="tagline">Find happy hours and deals near you</p>
+  </header>
+
+  <main>
+    <section class="filters">
+      <input id="search" type="search" placeholder="Search restaurants…" />
+      <select id="type">
+        <option value="">All types</option>
+        <option value="Gastropub">Gastropub</option>
+        <option value="Mexican & Mezcal Bar">Mexican & Mezcal Bar</option>
+        <option value="Izakaya & Taproom">Izakaya & Taproom</option>
+        <option value="Pizza & Craft Beer">Pizza & Craft Beer</option>
+      </select>
+      <input id="city" type="search" placeholder="City…" />
+      <button id="refresh">Refresh</button>
+    </section>
+
+    <section id="restaurant-list" class="restaurant-list" aria-live="polite"></section>
+
+    <section id="detail" class="detail hidden">
+      <button id="back">← Back to results</button>
+      <div id="detail-body"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

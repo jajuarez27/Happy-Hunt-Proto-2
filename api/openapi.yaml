@@ -1,0 +1,250 @@
+openapi: 3.0.3
+info:
+  title: Happy Hunt API
+  version: 0.1.0
+  description: >
+    Backend API for Happy Hunt. Proxies Supabase (service role, server-side only)
+    and serves the web client. All routes are under the API base URL
+    (http://localhost:3000 by default).
+servers:
+  - url: http://localhost:3000
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+  /api/restaurants:
+    get:
+      summary: List restaurants
+      operationId: listRestaurants
+      parameters:
+        - name: restaurant_type
+          in: query
+          schema: { type: string }
+          description: Exact-match restaurant type filter
+          example: Gastropub
+        - name: city
+          in: query
+          schema: { type: string }
+          description: Exact-match city filter (via locations)
+          example: Sacramento
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Case-insensitive partial match on restaurant name
+      responses:
+        '200':
+          description: >
+            List of restaurants, each embedding its location, happy hours,
+            and deals (restaurant → locations → happy_hours → deals).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restaurants:
+                    type: array
+                    items: { $ref: '#/components/schemas/Restaurant' }
+              example:
+                restaurants:
+                  - restaurant_id: 22222222-2222-4222-8222-222222222201
+                    name: The Copper Tap & Grill
+                    restaurant_type: Gastropub
+                    phone: '916-555-0141'
+                    website: https://coppertapgrill.example.com
+                    locations:
+                      - location_id: 33333333-3333-4333-8333-333333333301
+                        address: 1020 K St
+                        city: Sacramento
+                        state: CA
+                        zip_code: '95814'
+                        latitude: 38.5792
+                        longitude: -121.4918
+                        happy_hours:
+                          - happy_hour_id: 44444444-4444-4444-8444-444444444401
+                            day_of_week: Friday
+                            start_time: '15:00:00'
+                            end_time: '18:00:00'
+                            active: true
+                            source_url: https://coppertapgrill.example.com/happy-hour
+                            last_verified: '2026-11-15T16:00:00+00:00'
+                            deals:
+                              - deal_id: 55555555-5555-4555-8555-555555555501
+                                deal_name: Crispy Fries & Sliders
+                                deal_type: food
+                                regular_price: 16.00
+                                happy_hour_price: 9.00
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/restaurants/{id}:
+    get:
+      summary: Get a single restaurant
+      operationId: getRestaurant
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: restaurant_id
+      responses:
+        '200':
+          description: Restaurant detail including location, happy hours, and deals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  restaurant: { $ref: '#/components/schemas/Restaurant' }
+        '400':
+          description: Invalid UUID
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Restaurant not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /api/saved-places:
+    get:
+      summary: List a user's saved places
+      operationId: listSavedPlaces
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Saved places with embedded restaurant and location data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved_places:
+                    type: array
+                    items: { $ref: '#/components/schemas/SavedPlace' }
+        '400':
+          description: Missing or invalid user_id
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+    post:
+      summary: Save a place for a user
+      operationId: savePlace
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, restaurant_id]
+              properties:
+                user_id: { type: string, format: uuid }
+                restaurant_id: { type: string, format: uuid }
+            example:
+              user_id: 11111111-1111-4111-8111-111111111104
+              restaurant_id: 22222222-2222-4222-8222-222222222201
+      responses:
+        '201':
+          description: Place saved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  saved_place: { $ref: '#/components/schemas/SavedPlace' }
+        '400':
+          description: Missing or invalid fields
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: User or restaurant not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Place already saved (duplicate user_id + restaurant_id)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  schemas:
+    Restaurant:
+      type: object
+      properties:
+        restaurant_id: { type: string, format: uuid }
+        name: { type: string }
+        restaurant_type: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        website: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              location_id: { type: string, format: uuid }
+              restaurant_id: { type: string, format: uuid }
+              address: { type: string }
+              city: { type: string }
+              state: { type: string }
+              zip_code: { type: string }
+              latitude: { type: number, nullable: true }
+              longitude: { type: number, nullable: true }
+              happy_hours:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    happy_hour_id: { type: string, format: uuid }
+                    location_id: { type: string, format: uuid }
+                    source_url: { type: string, nullable: true }
+                    day_of_week:
+                      type: string
+                      enum: [Sunday, Monday, Tuesday, Wednesday, Thursday, Friday, Saturday]
+                    start_time: { type: string }
+                    end_time: { type: string }
+                    active: { type: boolean }
+                    last_verified: { type: string, format: date-time, nullable: true }
+                    deals:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          deal_id: { type: string, format: uuid }
+                          happy_hour_id: { type: string, format: uuid }
+                          deal_name: { type: string }
+                          description: { type: string, nullable: true }
+                          deal_type: { type: string, enum: [food, drink] }
+                          regular_price: { type: number, nullable: true }
+                          happy_hour_price: { type: number, nullable: true }
+    SavedPlace:
+      type: object
+      properties:
+        saved_place_id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        restaurant_id: { type: string, format: uuid }
+        saved_at: { type: string, format: date-time }
+        restaurants:
+          type: object
+          properties:
+            name: { type: string }
+    Error:
+      type: object
+      properties:
+        error: { type: string }
